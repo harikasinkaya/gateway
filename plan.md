@@ -1,20 +1,66 @@
-# OpenAI Compatible AI Gateway - Yol Haritası
+Node.js ve Fastify kullanarak OpenAI API uyumlu bir AI Gateway geliştir.
 
-## Proje Amacı
+Amaç:
+Kullanıcıların OpenAI standartlarında istek atabildiği, model alias sistemi bulunan ve her alias için farklı system prompt tanımlanabilen hafif bir gateway oluşturmak.
 
-OpenAI API standartlarına tam uyumlu bir AI Gateway geliştirmek.
+Teknolojiler:
 
-Amaçlar:
+* Node.js
+* Fastify
+* Native fetch
+* JSON tabanlı konfigürasyon
+* Veritabanı kullanma
 
-- OpenAI SDK'ları ile doğrudan çalışabilmek
-- Kendi sanal modellerimizi oluşturabilmek
-- Her modele özel sistem promptu tanımlayabilmek
-- Hafıza (Memory) desteği ekleyebilmek
-- Tool Calling desteği sunabilmek
-- Birden fazla sağlayıcıyı (OpenAI, Gemini, DeepSeek, Ollama vb.) tek API altında birleştirebilmek
-- Kullanıcıların sadece model adı değiştirerek farklı davranışlar elde etmesini sağlamak
+Dosya yapısı:
+
+```text
+/
+├── package.json
+├── server.js
+├── models.json
+└── prompts/
+    ├── barlas-v1.md
+    ├── barlas-v2.md
+    └── barlas-coder.md
+```
+
+Gereksinimler:
+
+1. OpenAI uyumlu endpoint oluştur:
+
+```http
+POST /v1/chat/completions
+```
+
+2. models.json dosyasından model konfigürasyonlarını oku.
 
 Örnek:
+
+```json
+{
+  "barlas-v1": {
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "prompt": "./prompts/barlas-v1.md"
+  },
+  "barlas-coder": {
+    "provider": "openai",
+    "model": "qwen3-coder",
+    "prompt": "./prompts/barlas-coder.md"
+  }
+}
+```
+
+3. İstek geldiğinde:
+
+* model alanını kontrol et
+* alias yapılandırmasını bul
+* prompt dosyasını oku
+* system mesajı olarak messages dizisinin başına ekle
+
+Örnek:
+
+Kullanıcı:
 
 ```json
 {
@@ -28,462 +74,89 @@ Amaçlar:
 }
 ```
 
-Gateway arka planda:
-
-- Sistem promptu ekler
-- Hafıza yükler
-- Toolları bağlar
-- Sağlayıcı seçer
-- Sonucu OpenAI formatında döndürür
-
----
-
-# Faz 1 - OpenAI Uyumluluğu
-
-## Endpointler
-
-### GET /v1/models
-
-Desteklenen sanal modelleri listeler.
-
-Örnek:
+Gateway:
 
 ```json
 {
-  "data": [
+  "model": "deepseek-chat",
+  "messages": [
     {
-      "id": "barlas-v1"
+      "role": "system",
+      "content": "...prompt dosyası..."
     },
     {
-      "id": "barlas-v2"
+      "role": "user",
+      "content": "Merhaba"
     }
   ]
 }
 ```
 
-### POST /v1/chat/completions
+4. Provider sistemi oluştur.
 
-Ana endpoint.
+Şimdilik desteklenecek providerlar:
 
-### POST /v1/embeddings
+* deepseek
+* openai
 
-Embedding desteği.
+Provider mantığı ayrı fonksiyonlar halinde yazılsın.
 
-### POST /v1/responses
+5. Ortam değişkenleri:
 
-Yeni OpenAI standardı için hazırlık.
-
----
-
-# Faz 2 - Model Registry
-
-Her model veritabanında kayıtlı olacak.
-
-Örnek:
-
-```json
-{
-  "id": "barlas-v1",
-  "provider": "deepseek",
-  "provider_model": "deepseek-chat",
-  "temperature": 0.7,
-  "memory": true,
-  "tools": true
-}
+```env
+DEEPSEEK_API_KEY=
+OPENAI_API_KEY=
+PORT=3000
 ```
 
-Örnek:
+6. Gerçek sağlayıcıya istek gönder.
 
-```json
-{
-  "id": "barlas-v2",
-  "provider": "gemini",
-  "provider_model": "gemini-2.5-pro"
-}
-```
-
-Amaç:
-
-Kullanıcının gerçek modeli bilmesine gerek kalmaması.
-
----
-
-# Faz 3 - Prompt Engine
-
-Her modelin kendi davranışı olacak.
-
-Örnek:
-
-## barlas-v1
+DeepSeek:
 
 ```text
-Sen Barlas V1'sin.
-Node.js konusunda uzmansın.
+https://api.deepseek.com/v1/chat/completions
 ```
 
-## barlas-v2
+OpenAI:
 
 ```text
-Sen Barlas V2'sin.
-Kod üretirken açıklamalı cevap ver.
+https://api.openai.com/v1/chat/completions
 ```
 
-İş Akışı:
+7. Dönen cevabı mümkün olduğunca OpenAI formatını bozmadan kullanıcıya ilet.
 
-```text
-Model Seç
-↓
-Sistem Promptunu Yükle
-↓
-Memory Yükle
-↓
-Kullanıcı Mesajını Ekle
-↓
-Provider'a Gönder
+8. Ek endpointler:
+
+```http
+GET /v1/models
+GET /health
 ```
 
----
+9. Hata yönetimi:
 
-# Faz 4 - Memory Sistemi
+* model bulunamadı
+* prompt dosyası yok
+* provider desteklenmiyor
+* API hataları
 
-## Kısa Süreli Hafıza
+için düzgün JSON response döndür.
 
-Son konuşmalar.
+10. Kod kalitesi:
 
-```sql
-messages
-```
+* Modüler yapı
+* Açıklayıcı yorumlar
+* any kullanma
+* Gereksiz bağımlılık ekleme
+* Production-ready kod yaz
 
----
+11. Bonus:
 
-## Uzun Süreli Hafıza
+Streaming desteği için altyapıyı hazır bırak ancak ilk sürümde implement etmek zorunlu değil.
 
-Önemli kullanıcı bilgileri.
+Görevi tamamladıktan sonra:
 
-```sql
-memories
-```
-
-Örnek:
-
-```json
-{
-  "user_id": "123",
-  "content": "Node.js kullanıyor"
-}
-```
-
----
-
-## Vektör Hafıza
-
-RAG sistemi.
-
-Alternatifler:
-
-- Qdrant
-- PgVector
-- Weaviate
-
-Amaç:
-
-Geçmiş konuşmaları geri çağırabilmek.
-
----
-
-# Faz 5 - Provider Sistemi
-
-Desteklenecek sağlayıcılar:
-
-- OpenAI
-- DeepSeek
-- Gemini
-- Claude
-- Ollama
-- OpenRouter
-
-Örnek:
-
-```text
-barlas-v1
-↓
-DeepSeek
-↓
-deepseek-chat
-```
-
-```text
-barlas-v2
-↓
-Gemini
-↓
-gemini-pro
-```
-
----
-
-# Faz 6 - Tool Calling
-
-İlk sürüm:
-
-- Web Search
-- Memory Search
-- Calculator
-- Code Execution
-
-İkinci sürüm:
-
-- Browser Automation
-- Playwright
-- MCP
-- File Search
-
----
-
-# Faz 7 - Streaming
-
-Tam OpenAI uyumlu SSE desteği.
-
-Örnek:
-
-```text
-data: {...}
-
-data: {...}
-
-data: [DONE]
-```
-
-OpenAI SDK'larının sorunsuz çalışması hedeflenir.
-
----
-
-# Faz 8 - API Key Sistemi
-
-Tablo:
-
-```sql
-api_keys
-```
-
-Alanlar:
-
-- id
-- key
-- owner
-- created_at
-- disabled
-
----
-
-# Faz 9 - Rate Limiting
-
-Destek:
-
-- RPM
-- TPM
-- Günlük Limit
-- Aylık Limit
-
-Örnek:
-
-```json
-{
-  "rpm": 60,
-  "tpm": 100000
-}
-```
-
----
-
-# Faz 10 - Kullanım Takibi
-
-Tablo:
-
-```sql
-usage_logs
-```
-
-Alanlar:
-
-- request_id
-- model
-- provider
-- input_tokens
-- output_tokens
-- latency
-- user_id
-
----
-
-# Faz 11 - Yönetim Paneli
-
-## Model Yönetimi
-
-- Model Ekle
-- Model Sil
-- Prompt Düzenle
-- Sağlayıcı Değiştir
-
-## API Key Yönetimi
-
-- Oluştur
-- Sil
-- Devre Dışı Bırak
-
-## İstatistikler
-
-- Toplam İstek
-- Token Kullanımı
-- Hata Oranları
-- Sağlayıcı Performansı
-
----
-
-# Faz 12 - Enterprise Özellikleri
-
-- Prompt Versiyonlama
-- Model Fallback
-- Multi Provider Routing
-- Auto Model Selection
-- A/B Testing
-- Agent Framework
-- Workflow Builder
-- MCP Marketplace
-- Fine-Tuning Yönetimi
-- Vision Modelleri
-- Ses Modelleri
-- Görsel Üretim Modelleri
-
----
-
-# Veritabanı Tasarımı
-
-## models
-
-```sql
-id
-name
-provider
-provider_model
-system_prompt
-temperature
-memory_enabled
-tools_enabled
-created_at
-```
-
-## api_keys
-
-```sql
-id
-key
-owner
-created_at
-```
-
-## conversations
-
-```sql
-id
-user_id
-model
-created_at
-```
-
-## messages
-
-```sql
-id
-conversation_id
-role
-content
-created_at
-```
-
-## memories
-
-```sql
-id
-user_id
-content
-embedding
-created_at
-```
-
-## usage_logs
-
-```sql
-id
-request_id
-user_id
-model
-provider
-input_tokens
-output_tokens
-latency
-created_at
-```
-
----
-
-# Teknoloji Seçimi
-
-Backend:
-
-- Node.js
-- TypeScript
-- Fastify
-
-Database:
-
-- PostgreSQL
-
-ORM:
-
-- Prisma
-
-Cache:
-
-- Redis
-
-Queue:
-
-- BullMQ
-
-Vector Database:
-
-- Qdrant
-
-Monitoring:
-
-- Prometheus
-- Grafana
-
-Container:
-
-- Docker
-
-Deployment:
-
-- Coolify
-- Dokploy
-- Kubernetes (ileride)
-
----
-
-# İlk MVP Hedefi
-
-- OpenAI uyumlu API
-- /v1/models
-- /v1/chat/completions
-- Streaming
-- Model Registry
-- Sistem Promptları
-- Hafıza Sistemi
-- DeepSeek Desteği
-- Gemini Desteği
-- Ollama Desteği
-- API Key Sistemi
-- Basit Yönetim Paneli
-
+* Tüm dosyaları oluştur
+* package.json hazırla
+* npm install sonrası çalışabilir hale getir
+* örnek models.json ve prompt dosyalarını ekle
+* çalıştırma talimatlarını README.md içinde açıkla
